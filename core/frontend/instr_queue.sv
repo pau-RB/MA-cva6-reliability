@@ -318,6 +318,49 @@ ariane_pkg::FETCH_FIFO_DEPTH
     assign fetch_entry_valid_o[NID] = ~|(instr_queue_empty & idx_ds[1]) & ~(&fetch_entry_is_cf);
   end
 
+  FTSR_CNT ftsr_iter_d, ftsr_iter_q, ftsr_iter_q_sub; // FTSR
+  logic ftsr_reissue;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin: ftsr_iter_seq
+    if(~rst_ni) begin
+      ftsr_iter_q <= FTSR_CNT'(ariane_pkg::FTSR_LVL-1);
+    end else begin
+      ftsr_iter_q <= ftsr_iter_d;
+    end
+  end
+
+  assign ftsr_iter_q_sub = ftsr_iter_q-'d1;
+
+  always_comb begin: ftsr_iter_comb
+
+    ftsr_iter_d = ftsr_iter_q;
+    ftsr_reissue = 1'b0;
+
+    if(ftsr_iter_q == FTSR_CNT'(ariane_pkg::FTSR_LVL-1)) begin
+
+      if(fetch_entry_valid_o[0] && fetch_entry_ready_i[0] && fetch_entry_o[0].is_ftsr) begin
+        // Fire FTSR issue
+        ftsr_iter_d = ftsr_iter_q_sub;
+        ftsr_reissue = 1'b1;
+      end
+
+    end else begin
+
+      if(fetch_entry_ready_i[0]) begin
+        if(ftsr_iter_q == '0) begin
+          // Back to FTSR top
+          ftsr_iter_d = FTSR_CNT'(ariane_pkg::FTSR_LVL-1);
+        end else begin
+          // Iterate FTSR
+          ftsr_iter_d = ftsr_iter_q_sub;
+          ftsr_reissue = 1'b1;
+        end
+      end
+
+    end
+
+  end
+
   assign idx_ds[0] = idx_ds_q;
   for (genvar i = 0; i <= ariane_pkg::SUPERSCALAR; i++) begin
     if (CVA6Cfg.INSTR_PER_FETCH > 1) begin
@@ -337,6 +380,8 @@ ariane_pkg::FETCH_FIFO_DEPTH
       // assemble fetch entry
       for (int unsigned i = 0; i <= ariane_pkg::SUPERSCALAR; i++) begin
         fetch_entry_o[i].instruction = '0;
+        fetch_entry_o[i].is_ftsr = 1'b0;
+        fetch_entry_o[i].idx_ftsr = '0;
         fetch_entry_o[i].address = pc_j[i];
         fetch_entry_o[i].ex.valid = 1'b0;
         fetch_entry_o[i].ex.cause = '0;
@@ -361,7 +406,9 @@ ariane_pkg::FETCH_FIFO_DEPTH
             fetch_entry_o[0].ex.cause = riscv::INSTR_PAGE_FAULT;
           end
           fetch_entry_o[0].instruction = instr_data_out[i].instr;
-          fetch_entry_o[0].ex.valid = instr_data_out[i].ex != ariane_pkg::FE_NONE;
+          fetch_entry_o[0].is_ftsr     = instr_data_out[i].redundant;
+          fetch_entry_o[0].idx_ftsr    = ftsr_iter_q;
+          fetch_entry_o[0].ex.valid    = instr_data_out[i].ex != ariane_pkg::FE_NONE;
           if (CVA6Cfg.TvalEn)
             fetch_entry_o[0].ex.tval = {
               {(CVA6Cfg.XLEN - CVA6Cfg.VLEN) {1'b0}}, instr_data_out[i].ex_vaddr
@@ -383,7 +430,9 @@ ariane_pkg::FETCH_FIFO_DEPTH
               fetch_entry_o[NID].ex.cause = riscv::INSTR_PAGE_FAULT;
             end
             fetch_entry_o[NID].instruction = instr_data_out[i].instr;
-            fetch_entry_o[NID].ex.valid = instr_data_out[i].ex != ariane_pkg::FE_NONE;
+            fetch_entry_o[NID].is_ftsr     = instr_data_out[i].redundant;
+            fetch_entry_o[NID].idx_ftsr    = ftsr_iter_q;
+            fetch_entry_o[NID].ex.valid    = instr_data_out[i].ex != ariane_pkg::FE_NONE;
             fetch_entry_o[NID].ex.tval = {{64 - riscv::VLEN{1'b0}}, instr_data_out[i].ex_vaddr};
             fetch_entry_o[NID].branch_predict.cf = instr_data_out[i].cf;
             // Cannot output two CF the same cycle.
@@ -405,7 +454,9 @@ ariane_pkg::FETCH_FIFO_DEPTH
       idx_ds_d = '0;
       idx_is_d = '0;
       fetch_entry_o[0].instruction = instr_data_out[0].instr;
-      fetch_entry_o[0].address = pc_q;
+      fetch_entry_o[0].is_ftsr     = instr_data_out[0].redundant;
+      fetch_entry_o[0].idx_ftsr    = ftsr_iter_q;
+      fetch_entry_o[0].address     = pc_q;
 
       fetch_entry_o[0].ex.valid = instr_data_out[0].ex != ariane_pkg::FE_NONE;
       if (instr_data_out[0].ex == ariane_pkg::FE_INSTR_ACCESS_FAULT) begin
@@ -429,13 +480,13 @@ ariane_pkg::FETCH_FIFO_DEPTH
       fetch_entry_o[0].branch_predict.predict_address = address_out;
       fetch_entry_o[0].branch_predict.cf = instr_data_out[0].cf;
 
-      pop_instr[0] = fetch_entry_valid_o[0] & fetch_entry_ready_i[0];
+      pop_instr[0] = fetch_entry_valid_o[0] & fetch_entry_ready_i[0] & !ftsr_reissue;
     end
   end
 
   for (genvar i = 0; i <= ariane_pkg::SUPERSCALAR; i++) begin
     assign fetch_entry_is_cf[i] = fetch_entry_o[i].branch_predict.cf != ariane_pkg::NoCF;
-    assign fetch_entry_fire[i]  = fetch_entry_valid_o[i] & fetch_entry_ready_i[i];
+    assign fetch_entry_fire[i]  = fetch_entry_valid_o[i] & fetch_entry_ready_i[i] & !ftsr_reissue;
   end
 
   assign pop_address = |(fetch_entry_is_cf & fetch_entry_fire);

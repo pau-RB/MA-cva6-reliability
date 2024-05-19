@@ -183,6 +183,8 @@ module id_stage #(
         .is_double_rd_macro_instr_i(is_double_rd_macro_instr_o),
         .is_illegal_i              (is_illegal_cmp[i]),
         .instruction_i             (instruction[i]),
+        .is_ftsr_i                 (fetch_entry_i[i].is_ftsr),
+        .idx_ftsr_i                (fetch_entry_i[i].idx_ftsr),
         .compressed_instr_i        (fetch_entry_i[i].instruction[15:0]),
         .branch_predict_i          (fetch_entry_i[i].branch_predict),
         .ex_i                      (fetch_entry_i[i].ex),

@@ -42,6 +42,9 @@ module decoder
     input logic is_illegal_i,
     // Instruction from fetch stage - FRONTEND
     input logic [31:0] instruction_i,
+    // FTSR
+    input logic is_ftsr_i, // FTSR
+    input logic [$clog2(ariane_pkg::FTSR_LVL)-1:0] idx_ftsr_i, // FTSR
     // Is a macro instruction - macro_decoder
     input logic is_macro_instr_i,
     // Is a last macro instruction - macro_decoder
@@ -165,6 +168,8 @@ module decoder
     virtual_illegal_instr                  = 1'b0;
     instruction_o.pc                       = pc_i;
     instruction_o.trans_id                 = '0;
+    instruction_o.is_ftsr                  = is_ftsr_i;  // FTSR
+    instruction_o.idx_ftsr                 = idx_ftsr_i; // FTSR
     instruction_o.fu                       = NONE;
     instruction_o.op                       = ariane_pkg::ADD;
     instruction_o.rs1                      = '0;
@@ -1419,6 +1424,9 @@ module decoder
 
         default: illegal_instr = 1'b1;
       endcase
+      if(is_ftsr_i && idx_ftsr_i != '0) begin
+        instruction_o.rd = '0;
+      end
     end
     if (CVA6Cfg.CvxifEn) begin
       if (is_illegal_i || illegal_instr) begin
@@ -1428,6 +1436,9 @@ module decoder
         instruction_o.rd[4:0]  = instr.r4type.rd;
         instruction_o.op       = ariane_pkg::OFFLOAD;
         imm_select             = RS3;
+        if(is_ftsr_i && idx_ftsr_i != '0) begin
+          instruction_o.rd = '0;
+        end
       end
     end
 
@@ -1443,6 +1454,9 @@ module decoder
         instruction_o.op        = acc_instruction.op;
         illegal_instr           = acc_illegal_instr;
         is_control_flow_instr_o = acc_is_control_flow_instr;
+        if(is_ftsr_i && idx_ftsr_i != '0) begin
+          instruction_o.rd = '0;
+        end
       end
     end
   end
