@@ -82,6 +82,8 @@ module cva6
     localparam type fetch_entry_t = struct packed {
       logic [CVA6Cfg.VLEN-1:0] address;  // the address of the instructions from below
       logic [31:0] instruction;  // instruction word
+      logic is_ftsr; // FTSR
+      FTSR_CNT idx_ftsr; // FTSR
       branchpredict_sbe_t     branch_predict; // this field contains branch prediction information regarding the forward branch path
       exception_t             ex;             // this field contains exceptions which might have happened earlier, e.g.: fetch exceptions
     },
@@ -90,6 +92,8 @@ module cva6
     localparam type scoreboard_entry_t = struct packed {
       logic [CVA6Cfg.VLEN-1:0] pc;  // PC of instruction
       logic [CVA6Cfg.TRANS_ID_BITS-1:0] trans_id;      // this can potentially be simplified, we could index the scoreboard entry
+      logic is_ftsr; // FTSR
+      FTSR_CNT idx_ftsr; // FTSR
       // with the transaction id in any case make the width more generic
       fu_t fu;  // functional unit to use
       fu_op op;  // operation to perform in each functional unit

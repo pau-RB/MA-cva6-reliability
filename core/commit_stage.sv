@@ -151,7 +151,7 @@ module commit_stage
 
     // we will not commit the instruction if we took an exception
     // and we do not commit the instruction if we requested a halt
-    if (commit_instr_i[0].valid && !commit_instr_i[0].ex.valid && !halt_i) begin
+    if (commit_instr_i[0].valid && (!commit_instr_i[0].is_ftsr || commit_instr_i[0].idx_ftsr == '0) && !commit_instr_i[0].ex.valid && !halt_i) begin
       if (CVA6Cfg.RVZCMP && commit_instr_i[0].is_macro_instr && commit_instr_i[0].is_last_macro_instr)
         commit_macro_ack[0] = 1'b1;
       else commit_macro_ack[0] = 1'b0;
@@ -286,6 +286,7 @@ module commit_stage
       // check if the second instruction can be committed as well and the first wasn't a CSR instruction
       // also if we are in single step mode don't retire the second instruction
       if (commit_ack_o[0] && commit_instr_i[1].valid
+                          && (!commit_instr_i[1].is_ftsr || commit_instr_i[1].idx_ftsr == '0)
                                 && !halt_i
                                 && !(commit_instr_i[0].fu inside {CSR})
                                 && !flush_dcache_i

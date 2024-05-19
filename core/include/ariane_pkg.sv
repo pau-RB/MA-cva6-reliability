@@ -28,6 +28,13 @@
 /// moved out to favour a fully parameterizable core.
 package ariane_pkg;
 
+  // ---------------
+  // FTSR
+  // ---------------
+
+  localparam int unsigned FTSR_LVL = 2;
+  localparam type FTSR_CNT = logic[$clog2(ariane_pkg::FTSR_LVL)-1:0];
+
   // TODO: Slowly move those parameters to the new system.
   localparam BITS_SATURATION_COUNTER = 2;
 
