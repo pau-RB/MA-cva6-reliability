@@ -32,6 +32,8 @@ module instr_scan #(
     output logic rvi_jump_o,
     // Instruction immediat - FRONTEND
     output logic [CVA6Cfg.VLEN-1:0] rvi_imm_o,
+    // Instruction can be issued with redundancy - FRONTEND
+    output logic rvi_redundant_o, // FTSR
     // Branch compressed instruction - FRONTEND
     output logic rvc_branch_o,
     // Unconditional jump compressed instruction - FRONTEND
@@ -88,6 +90,12 @@ module instr_scan #(
   assign rvi_branch_o = (instr_i[6:0] == riscv::OpcodeBranch);
   assign rvi_jalr_o = (instr_i[6:0] == riscv::OpcodeJalr);
   assign rvi_jump_o = logic'(instr_i[6:0] == riscv::OpcodeJal) | is_xret;
+
+  // FTSR
+  assign rvi_redundant_o = logic'(instr_i[6:0] inside {riscv::OpcodeOpImm  ,
+                                                       riscv::OpcodeOpImm32,
+                                                       riscv::OpcodeOp     ,
+                                                       riscv::OpcodeOp32   });
 
   // opcode JAL
   assign rvc_jump_o   = ((instr_i[15:13] == riscv::OpcodeC1J) & is_rvc & (instr_i[1:0] == riscv::OpcodeC1)) | rv32_rvc_jal;

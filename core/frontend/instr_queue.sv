@@ -57,6 +57,8 @@ module instr_queue
     input logic flush_i,
     // Instruction - instr_realign
     input logic [CVA6Cfg.INSTR_PER_FETCH-1:0][31:0] instr_i,
+    // Instruction - instruction with redundancy
+    input logic [CVA6Cfg.INSTR_PER_FETCH-1:0] redundant_i, // FTSR
     // Instruction address - instr_realign
     input logic [CVA6Cfg.INSTR_PER_FETCH-1:0][CVA6Cfg.VLEN-1:0] addr_i,
     // Instruction is valid - instr_realign
@@ -93,6 +95,7 @@ module instr_queue
 
   typedef struct packed {
     logic [31:0]                     instr;      // instruction word
+    logic                            redundant;  // must issue with redundancy FTSR
     ariane_pkg::cf_t                 cf;         // branch was taken
     ariane_pkg::frontend_exception_t ex;         // exception happened
     logic [CVA6Cfg.VLEN-1:0]         ex_vaddr;   // lower VLEN bits of tval for exception
@@ -148,6 +151,7 @@ ariane_pkg::FETCH_FIFO_DEPTH
   logic [CVA6Cfg.INSTR_PER_FETCH*2-1:0] fifo_pos_extended;
   logic [CVA6Cfg.INSTR_PER_FETCH-1:0] fifo_pos;
   logic [CVA6Cfg.INSTR_PER_FETCH*2-1:0][31:0] instr;
+  logic [CVA6Cfg.INSTR_PER_FETCH*2-1:0] redundant; // FTSR
   ariane_pkg::cf_t [CVA6Cfg.INSTR_PER_FETCH*2-1:0] cf;
   // replay interface
   logic [CVA6Cfg.INSTR_PER_FETCH-1:0] instr_overflow_fifo;
@@ -211,7 +215,9 @@ ariane_pkg::FETCH_FIFO_DEPTH
     // duplicate the entries for easier selection e.g.: 3 2 1 0 3 2 1 0
     for (genvar i = 0; i < CVA6Cfg.INSTR_PER_FETCH; i++) begin : gen_duplicate_instr_input
       assign instr[i] = instr_i[i];
+      assign redundant[i] = redundant_i[i]; // FTSR
       assign instr[i+CVA6Cfg.INSTR_PER_FETCH] = instr_i[i];
+      assign redundant[i+CVA6Cfg.INSTR_PER_FETCH] = redundant_i[i]; // FTSR
       assign cf[i] = cf_type_i[i];
       assign cf[i+CVA6Cfg.INSTR_PER_FETCH] = cf_type_i[i];
     end
@@ -220,6 +226,7 @@ ariane_pkg::FETCH_FIFO_DEPTH
     for (genvar i = 0; i < CVA6Cfg.INSTR_PER_FETCH; i++) begin : gen_fifo_input_select
       /* verilator lint_off WIDTH */
       assign instr_data_in[i].instr = instr[CVA6Cfg.INSTR_PER_FETCH+i-idx_is_q];
+      assign instr_data_in[i].redundant = redundant[CVA6Cfg.INSTR_PER_FETCH+i-idx_is_q]; // FTSR
       assign instr_data_in[i].cf = cf[CVA6Cfg.INSTR_PER_FETCH+i-idx_is_q];
       assign instr_data_in[i].ex = exception_i;  // exceptions hold for the whole fetch packet
       assign instr_data_in[i].ex_vaddr = exception_addr_i;
@@ -258,6 +265,7 @@ ariane_pkg::FETCH_FIFO_DEPTH
 
     /* verilator lint_off WIDTH */
     assign instr_data_in[0].instr = instr_i[0];
+    assign instr_data_in[0].redundant = redundant_i[0]; // FTSR
     assign instr_data_in[0].cf = cf_type_i[0];
     assign instr_data_in[0].ex = exception_i;  // exceptions hold for the whole fetch packet
     assign instr_data_in[0].ex_vaddr = exception_addr_i;

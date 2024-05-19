@@ -124,7 +124,7 @@ module frontend
   // Ctrl Flow Speculation
   // -----------------------
   // RVI ctrl flow prediction
-  logic [CVA6Cfg.INSTR_PER_FETCH-1:0] rvi_return, rvi_call, rvi_branch, rvi_jalr, rvi_jump;
+  logic [CVA6Cfg.INSTR_PER_FETCH-1:0] rvi_return, rvi_call, rvi_branch, rvi_jalr, rvi_jump, rvi_redundant;
   logic [CVA6Cfg.INSTR_PER_FETCH-1:0][CVA6Cfg.VLEN-1:0] rvi_imm;
   // RVC branching
   logic [CVA6Cfg.INSTR_PER_FETCH-1:0] rvc_branch, rvc_jump, rvc_jr, rvc_return, rvc_jalr, rvc_call;
@@ -529,20 +529,21 @@ module frontend
     instr_scan #(
         .CVA6Cfg(CVA6Cfg)
     ) i_instr_scan (
-        .instr_i     (instr[i]),
-        .rvi_return_o(rvi_return[i]),
-        .rvi_call_o  (rvi_call[i]),
-        .rvi_branch_o(rvi_branch[i]),
-        .rvi_jalr_o  (rvi_jalr[i]),
-        .rvi_jump_o  (rvi_jump[i]),
-        .rvi_imm_o   (rvi_imm[i]),
-        .rvc_branch_o(rvc_branch[i]),
-        .rvc_jump_o  (rvc_jump[i]),
-        .rvc_jr_o    (rvc_jr[i]),
-        .rvc_return_o(rvc_return[i]),
-        .rvc_jalr_o  (rvc_jalr[i]),
-        .rvc_call_o  (rvc_call[i]),
-        .rvc_imm_o   (rvc_imm[i])
+        .instr_i        (instr[i]),
+        .rvi_return_o   (rvi_return[i]),
+        .rvi_call_o     (rvi_call[i]),
+        .rvi_branch_o   (rvi_branch[i]),
+        .rvi_jalr_o     (rvi_jalr[i]),
+        .rvi_jump_o     (rvi_jump[i]),
+        .rvi_imm_o      (rvi_imm[i]),
+        .rvi_redundant_o(rvi_redundant[i]), // FTSR
+        .rvc_branch_o   (rvc_branch[i]),
+        .rvc_jump_o     (rvc_jump[i]),
+        .rvc_jr_o       (rvc_jr[i]),
+        .rvc_return_o   (rvc_return[i]),
+        .rvc_jalr_o     (rvc_jalr[i]),
+        .rvc_call_o     (rvc_call[i]),
+        .rvc_imm_o      (rvc_imm[i])
     );
   end
 
@@ -554,6 +555,7 @@ module frontend
       .rst_ni             (rst_ni),
       .flush_i            (flush_i),
       .instr_i            (instr),                 // from re-aligner
+      .redundant_i        (rvi_redundant),         // from re-aligner - FTSR
       .addr_i             (addr),                  // from re-aligner
       .exception_i        (icache_ex_valid_q),     // from I$
       .exception_addr_i   (icache_vaddr_q),
