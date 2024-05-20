@@ -44,7 +44,7 @@ module decoder
     input logic [31:0] instruction_i,
     // FTSR
     input logic is_ftsr_i, // FTSR
-    input logic [$clog2(ariane_pkg::FTSR_LVL)-1:0] idx_ftsr_i, // FTSR
+    input FTSR_CNT idx_ftsr_i, // FTSR
     // Is a macro instruction - macro_decoder
     input logic is_macro_instr_i,
     // Is a last macro instruction - macro_decoder
