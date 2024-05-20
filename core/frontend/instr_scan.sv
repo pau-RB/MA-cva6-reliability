@@ -93,9 +93,15 @@ module instr_scan #(
 
   // FTSR
   assign rvi_redundant_o = logic'(instr_i[6:0] inside {riscv::OpcodeOpImm  ,
+                                                       riscv::OpcodeAuipc  ,
                                                        riscv::OpcodeOpImm32,
                                                        riscv::OpcodeOp     ,
+                                                       riscv::OpcodeLui    ,
                                                        riscv::OpcodeOp32   ,
+                                                       riscv::OpcodeMadd   ,
+                                                       riscv::OpcodeMsub   ,
+                                                       riscv::OpcodeNmsub  ,
+                                                       riscv::OpcodeNmadd  ,
                                                        riscv::OpcodeOpFp   });
 
   // opcode JAL
