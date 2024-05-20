@@ -151,16 +151,20 @@ module commit_stage
 
     // we will not commit the instruction if we took an exception
     // and we do not commit the instruction if we requested a halt
-    if (commit_instr_i[0].valid && (!commit_instr_i[0].is_ftsr || commit_instr_i[0].idx_ftsr == '0) && !commit_instr_i[0].ex.valid && !halt_i) begin
+    if (commit_instr_i[0].valid && !commit_instr_i[0].ex.valid && !halt_i) begin
       if (CVA6Cfg.RVZCMP && commit_instr_i[0].is_macro_instr && commit_instr_i[0].is_last_macro_instr)
         commit_macro_ack[0] = 1'b1;
       else commit_macro_ack[0] = 1'b0;
+      if (commit_instr_i[0].is_ftsr && commit_instr_i[0].idx_ftsr != '0) begin
+        // TODO: Write to partial result stash for ftsr...
+      end
       // we can definitely write the register file
       // if the instruction is not committing anything the destination
       commit_ack_o[0] = 1'b1;
       if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[0].op)) begin
         we_fpr_o[0] = 1'b1;
       end else begin
+        // TODO: Check against stash for ftsr before actual write
         we_gpr_o[0] = 1'b1;
       end
       // check whether the instruction we retire was a store
@@ -286,17 +290,21 @@ module commit_stage
       // check if the second instruction can be committed as well and the first wasn't a CSR instruction
       // also if we are in single step mode don't retire the second instruction
       if (commit_ack_o[0] && commit_instr_i[1].valid
-                          && (!commit_instr_i[1].is_ftsr || commit_instr_i[1].idx_ftsr == '0)
-                                && !halt_i
-                                && !(commit_instr_i[0].fu inside {CSR})
-                                && !flush_dcache_i
-                                && !instr_0_is_amo
-                                && !single_step_i) begin
+                          && !halt_i
+                          && !(commit_instr_i[0].fu inside {CSR})
+                          && !flush_dcache_i
+                          && !instr_0_is_amo
+                          && !single_step_i) begin
         // only if the first instruction didn't throw an exception and this instruction won't throw an exception
         // and the functional unit is of type ALU, LOAD, CTRL_FLOW, MULT, FPU or FPU_VEC
         if (!exception_o.valid && !commit_instr_i[1].ex.valid
                                        && (commit_instr_i[1].fu inside {ALU, LOAD, CTRL_FLOW, MULT, FPU, FPU_VEC})) begin
 
+          if (commit_instr_i[1].is_ftsr && commit_instr_i[1].idx_ftsr != '0) begin
+            // TODO: Write to partial result stash for ftsr...
+          end
+
+          // TODO: Check against stash for ftsr before actual write
           if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[1].op)) we_fpr_o[1] = 1'b1;
           else we_gpr_o[1] = 1'b1;
 
