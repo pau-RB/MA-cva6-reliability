@@ -32,7 +32,7 @@ package ariane_pkg;
   // FTSR
   // ---------------
 
-  localparam int unsigned FTSR_LVL = 2;
+  localparam int unsigned FTSR_LVL = 3;
   localparam type FTSR_CNT = logic[$clog2(ariane_pkg::FTSR_LVL)-1:0];
 
   // TODO: Slowly move those parameters to the new system.
