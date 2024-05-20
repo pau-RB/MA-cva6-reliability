@@ -161,7 +161,8 @@ module commit_stage
       // we can definitely write the register file
       // if the instruction is not committing anything the destination
       commit_ack_o[0] = 1'b1;
-      if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[0].op)) begin
+      if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[0].op) && !(commit_instr_i[0].is_ftsr && commit_instr_i[0].idx_ftsr != '0)) begin
+        // TODO: Check against stash for ftsr before actual write
         we_fpr_o[0] = 1'b1;
       end else begin
         // TODO: Check against stash for ftsr before actual write
@@ -304,9 +305,13 @@ module commit_stage
             // TODO: Write to partial result stash for ftsr...
           end
 
-          // TODO: Check against stash for ftsr before actual write
-          if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[1].op)) we_fpr_o[1] = 1'b1;
-          else we_gpr_o[1] = 1'b1;
+          if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[1].op) && !(commit_instr_i[1].is_ftsr && commit_instr_i[1].idx_ftsr != '0)) begin
+            // TODO: Check against stash for ftsr before actual write
+            we_fpr_o[1] = 1'b1;
+          end else begin
+            // TODO: Check against stash for ftsr before actual write
+            we_gpr_o[1] = 1'b1;
+          end
 
           if (commit_instr_i[1].is_macro_instr && commit_instr_i[1].is_last_macro_instr)
             commit_macro_ack[1] = 1'b1;

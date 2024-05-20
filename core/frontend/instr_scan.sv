@@ -95,7 +95,8 @@ module instr_scan #(
   assign rvi_redundant_o = logic'(instr_i[6:0] inside {riscv::OpcodeOpImm  ,
                                                        riscv::OpcodeOpImm32,
                                                        riscv::OpcodeOp     ,
-                                                       riscv::OpcodeOp32   });
+                                                       riscv::OpcodeOp32   ,
+                                                       riscv::OpcodeOpFp   });
 
   // opcode JAL
   assign rvc_jump_o   = ((instr_i[15:13] == riscv::OpcodeC1J) & is_rvc & (instr_i[1:0] == riscv::OpcodeC1)) | rv32_rvc_jal;
