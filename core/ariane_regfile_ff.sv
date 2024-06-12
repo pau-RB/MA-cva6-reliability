@@ -75,9 +75,13 @@ module ariane_regfile #(
       end
     end
   end
-
+  localparam SEED = 10;
+  localparam PROB = 50;
   for (genvar i = 0; i < NR_READ_PORTS; i++) begin
-    assign rdata_o[i] = mem[raddr_i[i]];
+    //assign rdata_o[i] = mem[raddr_i[i]];
+    assign rdata_o[i] = ($dist_uniform(SEED, 0, 1)<PROB)? mem[raddr_i[i]] : mem[$urandom % 32];
+
+
   end
 
 endmodule
