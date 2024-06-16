@@ -266,8 +266,6 @@ package ariane_pkg;
   localparam int unsigned MEM_TID_WIDTH = `L15_THREADID_WIDTH;
 `endif
 
-  localparam int unsigned WT_DCACHE_WBUF_DEPTH = cva6_config_pkg::CVA6ConfigWtDcacheWbufDepth;
-
   // ---------------
   // EX Stage
   // ---------------
@@ -577,12 +575,6 @@ package ariane_pkg;
       default: return 1'b0;
     endcase
   endfunction
-
-  // ---------------
-  // MMU instanciation
-  // ---------------
-  localparam int unsigned INSTR_TLB_ENTRIES = cva6_config_pkg::CVA6ConfigInstrTlbEntries;
-  localparam int unsigned DATA_TLB_ENTRIES = cva6_config_pkg::CVA6ConfigDataTlbEntries;
 
   // -------------------
   // Performance counter

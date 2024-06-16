@@ -32,8 +32,9 @@ FLIST_TB   := $(CVA6_TB_DIR)/Flist.cva6_tb
 # target takes one of the following cva6 hardware configuration:
 # cv64a6_imafdc_sv39, cv32a6_imac_sv0, cv32a6_imac_sv32, cv32a6_imafc_sv32
 target     ?= cv64a6_imafdc_sv39
-FLIST_CORE := $(if $(gate), $(CVA6_REPO_DIR)/core/Flist.cva6_gate,$(CVA6_REPO_DIR)/core/Flist.cva6)
-
+FLIST_CORE = $(if $(gate),$(CVA6_REPO_DIR)/core/Flist.cva6_gate,$(CVA6_REPO_DIR)/core/Flist.cva6)
+th_top_level      := $(if $(gate),ariane_gate_tb,ariane_tb)
+do_file           := $(if $(gate),init_gate,init_testharness)
 TRACE_FAST      ?=
 TRACE_COMPACT   ?=
 VERDI           ?=
@@ -59,12 +60,12 @@ endif
 ##############################################
 
 # Set default Spike parameter file.
-spike_yaml ?= $(CVA6_REPO_DIR)/verif/spike_configs/$(target).yaml
+spike_yaml ?= $(CVA6_REPO_DIR)/config/gen_from_riscv_config/$(target)/spike/spike.yaml
 
 # Set up flags for Spike solo and tandem invocations, but only if parameter file exists.
 ifneq ($(wildcard $(spike_yaml)),)
   spike_params += --yaml-param $(spike_yaml)
-  spike-yaml-plusarg = +config_file=$(CVA6_REPO_DIR)/verif/spike_configs/$(target).yaml
+  spike-yaml-plusarg = +config_file=$(CVA6_REPO_DIR)/config/gen_from_riscv_config/$(target)/spike/spike.yaml
 endif
 
 ##############################################
@@ -142,54 +143,11 @@ spike:
 	cp $(log).iss $(log)
 
 ###############################################################################
-# testharness specific commands, variables
-###############################################################################
-vcs-testharness:
-	make -C $(path_var) work-dpi/ariane_dpi.so
-	make -C $(path_var) vcs_build target=$(target) defines=$(subst +define+,,$(isscomp_opts))$(if $(spike-tandem),SPIKE_TANDEM=1)
-	$(path_var)/work-vcs/simv $(if $(VERDI), -verdi -do $(path_var)/util/init_testharness.do,) +permissive \
-	  +tohost_addr=$(shell $$RISCV/bin/${CV_SW_PREFIX}nm -B $(elf) | grep -w tohost | cut -d' ' -f1) \
-          $(spike-yaml-plusarg) \
-	  +elf_file=$(elf) +permissive-off ++$(elf) $(issrun_opts)  \
-	  $(if $(spike-tandem),-sv_lib $(SPIKE_INSTALL_DIR)/lib/libdisasm) \
-	  $(if $(spike-tandem),-sv_lib $(SPIKE_INSTALL_DIR)/lib/libriscv) \
-	  -sv_lib $(SPIKE_INSTALL_DIR)/lib/libfesvr
-	# If present, move default waveform files to log directory.
-	# Keep track of target in waveform file name.
-	[ ! -f novas.vpd  ] || \
-	  mv novas.vpd  `dirname $(log)`/`basename $(log) .log`.vpd
-	[ ! -f novas.fsdb ] || \
-	  mv novas.fsdb `dirname $(log)`/`basename $(log) .log`.fsdb
-	# Generate disassembled log.
-	$(tool_path)/spike-dasm --isa=$(variant) < ./trace_rvfi_hart_00.dasm > $(log)
-	grep $(isspostrun_opts) ./trace_rvfi_hart_00.dasm
-
-veri-testharness:
-	make -C $(path_var) verilate verilator="verilator --no-timing" target=$(target) defines=$(subst +define+,,$(isscomp_opts))
-	$(path_var)/work-ver/Variane_testharness $(if $(TRACE_COMPACT), -f verilator.fst) $(if $(TRACE_FAST), -v verilator.vcd) $(elf) $(issrun_opts) \
-	  $(COMMON_PLUS_ARGS)
-	# If present, move default waveform files to log directory.
-	# Keep track of target in waveform file name.
-	[ ! -f verilator.fst ] || mv verilator.fst `dirname $(log)`/`basename $(log) .log`.fst
-	[ ! -f verilator.vcd ] || mv verilator.vcd `dirname $(log)`/`basename $(log) .log`.vcd
-	# Generate disassembled log.
-	$(tool_path)/spike-dasm --isa=$(variant) < ./trace_rvfi_hart_00.dasm > $(log)
-	grep $(isspostrun_opts) ./trace_rvfi_hart_00.dasm
-
-questa-testharness:
-	mkdir -p $(path_var)/tmp
-	make -C $(path_var) sim target=$(target) defines=$(subst +define+,,$(isscomp_opts)) batch-mode=1 elf_file=$(elf) \
-	# TODO: Add support for waveform collection.
-	$(tool_path)/spike-dasm --isa=$(variant) < $(path_var)/trace_rvfi_hart_00.dasm > $(log)
-	grep $(isspostrun_opts) $(path_var)/trace_rvfi_hart_00.dasm
-
-###############################################################################
 # UVM specific commands, variables
 ###############################################################################
-ALL_VCS_FLAGS           = $(if $(VERDI), -kdb -debug_access+all -lca,) -sverilog -full64 -timescale=1ns/1ns
 VCS_WORK_DIR            = $(CVA6_REPO_DIR)/verif/sim/vcs_results/default/vcs.d
-VSIM_WORK_DIR            = $(CVA6_REPO_DIR)/verif/sim/vsim_results/default/vsim.d
-SIMV                    = $(VCS_WORK_DIR)/simv
+VSIM_WORK_DIR           = $(CVA6_REPO_DIR)/verif/sim/vsim_results/default/vsim.d
+XRUN_WORK_DIR           = $(CVA6_REPO_DIR)/verif/sim/xrun_results
 
 export CVA6_UVMT_DIR          = $(CVA6_REPO_DIR)/verif/tb/uvmt
 export CVA6_CORET_DIR          = $(CVA6_REPO_DIR)/verif/tb/core
@@ -234,31 +192,20 @@ COMMON_PLUS_ARGS = \
 	+elf_file=$(elf) \
         $(spike-yaml-plusarg) \
 	+tohost_addr=$(shell $$RISCV/bin/$(CV_SW_PREFIX)nm -B $(elf) | grep -w tohost | cut -d' ' -f1) \
-	+signature=$(elf).signature_output  +UVM_TESTNAME=uvmt_cva6_firmware_test_c
-
-ifneq ($(UVM_VERBOSITY),)
-COMMON_PLUS_ARGS += +UVM_VERBOSITY=$(UVM_VERBOSITY)
-endif
-
-COMMON_RUN_UVM_FLAGS = \
-	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libriscv \
-	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libfesvr \
-	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libdisasm \
-	++$(elf) \
-	+elf_file=$(elf) \
+	+signature=$(elf).signature_output +UVM_TESTNAME=uvmt_cva6_firmware_test_c \
 	$(spike-yaml-plusarg) \
-	+tohost_addr=$(shell $$RISCV/bin/$(CV_SW_PREFIX)nm -B $(elf) | grep -w tohost | cut -d' ' -f1) \
-	+signature=$(elf).signature_output  +UVM_TESTNAME=uvmt_cva6_firmware_test_c
+	+report_file=$(log).yaml +core_name=$(target)
 
 ifneq ($(UVM_VERBOSITY),)
 COMMON_PLUS_ARGS += +UVM_VERBOSITY=$(UVM_VERBOSITY)
 endif
 
-COMMON_RUN_UVM_FLAGS = \
+COMMON_RUN_ARGS = \
+	$(COMMON_PLUS_ARGS) $(issrun_opts) \
+	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libcustomext \
 	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libriscv \
 	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libfesvr \
-	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libdisasm \
-	$(COMMON_PLUS_ARGS)
+	-sv_lib $(SPIKE_INSTALL_DIR)/lib/libdisasm
 
 ALL_UVM_FLAGS   = -lca -sverilog +incdir+$(VCS_HOME)/etc/uvm/src \
 	  $(VCS_HOME)/etc/uvm/src/uvm_pkg.sv -ntb_opts uvm-1.2 -timescale=1ns/1ps \
@@ -267,6 +214,29 @@ ALL_UVM_FLAGS   = -lca -sverilog +incdir+$(VCS_HOME)/etc/uvm/src \
 	  -cm_seqnoconst -diag noconst \
 
 ALL_SIMV_UVM_FLAGS      = +vcs+lic+wait $(issrun_opts) \
+
+ALL_XRUN_UVM_FLAGS      = -elaborate -messages -sv +incdir+$(XCELIUM_HOME)/tools.lnx86/methodology/UVM/CDNS-1.2/sv/src/ \
+	  $(XCELIUM_HOME)/tools.lnx86/methodology/UVM/CDNS-1.2/sv/src/uvm_pkg.sv +UVM_VERBOSITY=UVM_LOW -uvm -uvmhome CDNS-1.2 \
+	  -64 +incdir+$(XCELIUM_HOME)/tools.lnx86/methodology/UVM/CDNS-1.2/sv/src \
+	  +incdir+$(CVA6_REPO_DIR)/verif/env/uvme +incdir+$(CVA6_REPO_DIR)/verif/tb/uvmt \
+	  -xmerror CUNOTB -nowarn CUDEFB -nowarn CUSRCH -warn_multiple_driver -relax_svbtis -timescale 1ns/1ps -status -access +rwc -log   $(XRUN_WORK_DIR)/tb_compile.log
+
+ALL_XRUN_SIMV_UVM_FLAGS      =  +sv_lib=$(CVA6_REPO_DIR)/tools/spike/lib/libdisasm +signature=I-ADD-01.signature_output
+		          
+XRUN_RUN_FLAGS := -R -messages -status -64bit -licqueue -noupdate -log xrun.log -uvmhome CDNS-1.2  +UVM_VERBOSITY=UVM_LOW -svseed 1 		
+
+XRUN_DISABLED_WARNINGS := BIGWIX 	\
+                        ZROMCW 		\
+			STRINT 		\
+			ENUMERR 	\
+			SPDUSD		\
+			RNDXCELON
+
+XRUN_DISABLED_WARNINGS 	:= $(patsubst %, -nowarn %, $(XRUN_DISABLED_WARNINGS))
+
+XRUN_RUN = $(XRUN_RUN_FLAGS) 		\
+	   $(ALL_XRUN_SIMV_UVM_FLAGS)	\
+	   $(XRUN_DISABLED_WARNINGS)	
 
 ifneq ($(DEBUG),)               # If RTL DEBUG support requested
   ifneq ($(VERDI),)             #   If VERDI interactive mode requested, use GUI and do not run simulation
@@ -287,11 +257,14 @@ ifneq ($(DEBUG),)               # If RTL DEBUG support requested
 endif
 
 ifneq ($(SPIKE_TANDEM),)
-COMMON_RUN_UVM_FLAGS += +scoreboard_enabled=1
+ALL_SIMV_UVM_FLAGS += +scoreboard_enabled=1
+ALL_XRUN_SIMV_UVM_FLAGS += +scoreboard_enabled=1
 else
-COMMON_RUN_UVM_FLAGS += +scoreboard_enabled=0
+ALL_SIMV_UVM_FLAGS += +scoreboard_enabled=0
+ALL_XRUN_SIMV_UVM_FLAGS += +scoreboard_enabled=0
 endif
 
+### VCS UVM rules
 vcs_uvm_comp:
 	@echo "[VCS] Building Model"
 	mkdir -p $(VCS_WORK_DIR)
@@ -299,19 +272,18 @@ vcs_uvm_comp:
 	  -f $(FLIST_CORE) -f $(FLIST_TB) \
 	  -f $(CVA6_UVMT_DIR)/uvmt_cva6.flist \
 	  $(cov-comp-opt) +define+UNSUPPORTED_WITH+ $(isscomp_opts)\
+	  -ignore initializer_driver_checks \
 	  -top uvmt_cva6_tb
 
-vcs_uvm_run:
+vcs_uvm_run: vcs_uvm_comp
 	$(if $(TRACE_FAST), unset VERDI_HOME ;) \
 	cd $(VCS_WORK_DIR)/ && \
 	$(VCS_WORK_DIR)/simv \
-	    $(COMMON_RUN_UVM_FLAGS) \
+	    $(COMMON_RUN_ARGS) \
 	    $(ALL_SIMV_UVM_FLAGS) \
 	    $(cov-run-opt) $(issrun_opts)
 
-vcs-uvm:
-	make vcs_uvm_comp
-	make vcs_uvm_run
+vcs-uvm: vcs_uvm_comp vcs_uvm_run
 	# If present, move default waveform files to log directory.
 	# Keep track of target in waveform file name.
 	[ ! -f $(VCS_WORK_DIR)/novas.vpd  ] || \
@@ -321,6 +293,40 @@ vcs-uvm:
 	# Generate disassembled log.
 	$(tool_path)/spike-dasm --isa=$(variant) < ./vcs_results/default/vcs.d/trace_rvfi_hart_00.dasm > $(log)
 
+
+### XRUN UVM rules
+xrun_uvm_comp: 
+	@echo "[XRUN] Building Model"
+	mkdir -p $(XRUN_WORK_DIR)
+	cd $(XRUN_WORK_DIR) && \
+          xrun $(ALL_XRUN_UVM_FLAGS) \
+          -f $(FLIST_CORE) \
+          -f $(FLIST_TB) \
+          -f $(CVA6_UVMT_PATH)/uvmt_cva6.flist \
+          $(cov-comp-opt) $(isscomp_opts)\
+	  -top uvmt_cva6_tb
+
+xrun_uvm_run:
+	@echo "[XRUN] Running"
+	cd $(XRUN_WORK_DIR) && 	\
+	  xrun 			\
+	  $(XRUN_RUN)			\
+	  +sv_lib=$(SPIKE_INSTALL_DIR)/lib/libriscv \
+	  +sv_lib=$(SPIKE_INSTALL_DIR)/lib/libfesvr \
+	  +sv_lib=$(SPIKE_INSTALL_DIR)/lib/libdisasm \
+	  ++$(elf) \
+	  +elf_file=$(elf) \
+          +define+UVM_NO_DEPRECATED  \
+	  +UVM_TESTNAME=uvmt_cva6_firmware_test_c	\
+	  +tohost_addr=$(shell ${RISCV}/bin/${CV_SW_PREFIX}nm -B $(elf) | grep -w tohost | cut -d' ' -f1)          \
+	  $(cov-comp-opt) $(issrun_opts)
+	  			
+
+xrun-uvm: xrun_uvm_comp xrun_uvm_run
+	$(tool_path)/spike-dasm --isa=$(variant) < ./xrun_results/trace_rvfi_hart_00.dasm > $(log)
+
+
+### QUESTA UVM rules
 questa_uvm_comp:
 	@echo "[QUESTA] Building Model"
 	mkdir -p $(VSIM_WORK_DIR)
@@ -368,17 +374,70 @@ questa-uvm:
 
 
 generate_cov_dash:
-	urg -hvp_proj cva6_embedded -format both -group instcov_for_score -hvp_attributes weight+description+Comment -dir vcs_results/default/vcs.d/simv.vdb -plan cva6.hvp -tgl portsonly
+	urg -warn none -hvp_proj cva6_embedded -format both -group instcov_for_score -hvp_attributes weight+description+Comment -dir vcs_results/default/vcs.d/simv.vdb -plan cva6.hvp -tgl portsonly
 
 vcs_clean_all:
 	@echo "[VCS] Cleanup (entire vcs_work dir)"
 	rm -rf $(CVA6_REPO_DIR)/verif/sim/vcs_results/ verdiLog/ simv* *.daidir *.vpd *.fsdb *.db csrc ucli.key vc_hdrs.h novas* inter.fsdb uart
 
+xrun_clean_all:
+	@echo "[XRUN] Cleanup (entire xrun_work dir)"
+	rm -rf $(CVA6_REPO_DIR)/verif/sim/xrun_results/
+
+
+###############################################################################
+# testharness specific commands, variables
+###############################################################################
+vcs-testharness:
+	make -C $(path_var) vcs_build target=$(target) gate=$(gate) top_level=$(th_top_level) flist=$(FLIST_CORE) defines=$(subst +define+,,$(isscomp_opts))$(if $(spike-tandem),SPIKE_TANDEM=1)
+	$(path_var)/work-vcs/simv $(if $(VERDI), -verdi -do $(path_var)/util/$(do_file).do,) +permissive \
+	    +permissive-off $(COMMON_RUN_ARGS)
+	# If present, move default waveform files to log directory.
+	# Keep track of target in waveform file name.
+	[ ! -f novas.vpd  ] || \
+	  mv novas.vpd  `dirname $(log)`/`basename $(log) .log`.vpd
+	[ ! -f novas.fsdb ] || \
+	  mv novas.fsdb `dirname $(log)`/`basename $(log) .log`.fsdb
+	# Generate disassembled log.
+	$(tool_path)/spike-dasm --isa=$(variant) < ./trace_rvfi_hart_00.dasm > $(log)
+	grep $(isspostrun_opts) ./trace_rvfi_hart_00.dasm
+
+veri-testharness:
+	make -C $(path_var) verilate verilator="verilator --no-timing" target=$(target) defines=$(subst +define+,,$(isscomp_opts))
+	$(path_var)/work-ver/Variane_testharness $(if $(TRACE_COMPACT), -f verilator.fst) $(if $(TRACE_FAST), -v verilator.vcd) $(elf) $(issrun_opts) \
+	  $(COMMON_PLUS_ARGS)
+	# If present, move default waveform files to log directory.
+	# Keep track of target in waveform file name.
+	[ ! -f verilator.fst ] || mv verilator.fst `dirname $(log)`/`basename $(log) .log`.fst
+	[ ! -f verilator.vcd ] || mv verilator.vcd `dirname $(log)`/`basename $(log) .log`.vcd
+	# Generate disassembled log.
+	$(tool_path)/spike-dasm --isa=$(variant) < ./trace_rvfi_hart_00.dasm > $(log)
+	grep $(isspostrun_opts) ./trace_rvfi_hart_00.dasm
+
+xrun-testharness:
+	@echo "[XRUN-TESTHARNESS] Running"
+	@echo "[XRUN-TESTHARNESS] $(path_var)"
+	@echo "[XRUN-TESTHARNESS] $(XRUN_WORK_DIR)"
+	@echo "[XRUN-TESTHARNESS] $(elf)"
+	mkdir -p $(XRUN_WORK_DIR)
+	make -C $(path_var) work-dpi/xrun_ariane_dpi.so
+	@echo "[XRUN-TESTHARNESS] $(elf)"
+	make -C $(path_var) xrun_sim target=$(target) defines=$(subst +define+,,$(isscomp_opts))$(if $(spike-tandem),SPIKE_TANDEM=1)
+	@echo "[XRUN-TESTHARNESS1] $(elf)"
+	$(CVA6_REPO_DIR)/tools/spike/spike-dasm --isa=$(variant) < ./xrun_results/xcelium.d/trace_rvfi_hart_00.dasm > $(log)
+
+questa-testharness:
+	mkdir -p $(path_var)/tmp
+	make -C $(path_var) sim target=$(target) defines=$(subst +define+,,$(isscomp_opts)) batch-mode=1 elf_file=$(elf) \
+	# TODO: Add support for waveform collection.
+	$(tool_path)/spike-dasm --isa=$(variant) < $(path_var)/trace_rvfi_hart_00.dasm > $(log)
+	grep $(isspostrun_opts) $(path_var)/trace_rvfi_hart_00.dasm
+
 ###############################################################################
 # Common targets and rules
 ###############################################################################
 
-clean_all: vcs_clean_all
+clean_all: vcs_clean_all 
 	rm -f *.txt
 	rm -f trace*.log
 	rm -f trace*.dasm

@@ -19,7 +19,7 @@ package cva6_config_pkg;
 
   localparam CVA6ConfigXlen = 64;
 
-  localparam CVA6ConfigFpuEn = 1;
+  localparam CVA6ConfigRVF = 1;
   localparam CVA6ConfigF16En = 0;
   localparam CVA6ConfigF16AltEn = 0;
   localparam CVA6ConfigF8En = 0;
@@ -65,9 +65,6 @@ package cva6_config_pkg;
   localparam CVA6ConfigNrStorePipeRegs = 0;
   localparam CVA6ConfigNrLoadBufEntries = 8;
 
-  localparam CVA6ConfigInstrTlbEntries = 16;
-  localparam CVA6ConfigDataTlbEntries = 16;
-
   localparam CVA6ConfigRASDepth = 2;
   localparam CVA6ConfigBTBEntries = 32;
   localparam CVA6ConfigBHTEntries = 128;
@@ -87,6 +84,7 @@ package cva6_config_pkg;
   localparam config_pkg::cva6_user_cfg_t cva6_cfg = '{
       XLEN: unsigned'(CVA6ConfigXlen),
       FpgaEn: bit'(CVA6ConfigFpgaEn),
+      TechnoCut: bit'(0),
       NrCommitPorts: unsigned'(CVA6ConfigNrCommitPorts),
       AxiAddrWidth: unsigned'(CVA6ConfigAxiAddrWidth),
       AxiDataWidth: unsigned'(CVA6ConfigAxiDataWidth),
@@ -94,7 +92,8 @@ package cva6_config_pkg;
       AxiUserWidth: unsigned'(CVA6ConfigDataUserWidth),
       MemTidWidth: unsigned'(CVA6ConfigMemTidWidth),
       NrLoadBufEntries: unsigned'(CVA6ConfigNrLoadBufEntries),
-      FpuEn: bit'(CVA6ConfigFpuEn),
+      RVF: bit'(CVA6ConfigRVF),
+      RVD: bit'(CVA6ConfigRVF),
       XF16: bit'(CVA6ConfigF16En),
       XF16ALT: bit'(CVA6ConfigF16AltEn),
       XF8: bit'(CVA6ConfigF8En),
@@ -108,6 +107,8 @@ package cva6_config_pkg;
       XFVec: bit'(CVA6ConfigFVecEn),
       CvxifEn: bit'(CVA6ConfigCvxifEn),
       RVZiCond: bit'(CVA6ConfigRVZiCond),
+      RVZicntr: bit'(1),
+      RVZihpm: bit'(1),
       NrScoreboardEntries: unsigned'(CVA6ConfigNrScoreboardEntries),
       PerfCounterEn: bit'(CVA6ConfigPerfCounterEn),
       MmuPresent: bit'(CVA6ConfigMmuPresent),
@@ -120,6 +121,7 @@ package cva6_config_pkg;
       BHTEntries: unsigned'(CVA6ConfigBHTEntries),
       DmBaseAddress: 64'h0,
       TvalEn: bit'(CVA6ConfigTvalEn),
+      DirectVecOnly: bit'(0),
       NrPMPEntries: unsigned'(CVA6ConfigNrPMPEntries),
       PMPCfgRstVal: {16{64'h0}},
       PMPAddrRstVal: {16{64'h0}},
@@ -148,8 +150,10 @@ package cva6_config_pkg;
       WtDcacheWbufDepth: int'(CVA6ConfigWtDcacheWbufDepth),
       FetchUserWidth: unsigned'(CVA6ConfigFetchUserWidth),
       FetchUserEn: unsigned'(CVA6ConfigFetchUserEn),
-      InstrTlbEntries: int'(CVA6ConfigInstrTlbEntries),
-      DataTlbEntries: int'(CVA6ConfigDataTlbEntries),
+      InstrTlbEntries: int'(16),
+      DataTlbEntries: int'(16),
+      UseSharedTlb: bit'(0),
+      SharedTlbDepth: int'(64),
       NrLoadPipeRegs: int'(CVA6ConfigNrLoadPipeRegs),
       NrStorePipeRegs: int'(CVA6ConfigNrStorePipeRegs),
       DcacheIdWidth: int'(CVA6ConfigDcacheIdWidth)
