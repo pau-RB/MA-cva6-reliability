@@ -126,6 +126,24 @@ module commit_stage
   // Commit Instruction
   // -------------------
   // write register file or commit instruction in LSU or CSR Buffer
+
+
+  // FTSR
+
+  logic [ariane_pkg::FTSR_LVL:1] stash_we;
+  logic [ariane_pkg::FTSR_LVL:1][CVA6Cfg.XLEN-1:0] wdata_stash_d, wdata_stash_q;
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (~rst_ni) begin
+      wdata_stash_q <= '0;
+    end else begin
+      for (int i = 1; i <= ariane_pkg::FTSR_LVL; ++i) begin
+        if(stash_we[i]) wdata_stash_q[i] <= wdata_stash_d[i];
+      end
+    end
+  end
+
+
   always_comb begin : commit
     // default assignments
     commit_ack_o[0] = 1'b0;
@@ -149,6 +167,10 @@ module commit_stage
     csr_write_fflags_o = 1'b0;
     flush_commit_o = 1'b0;
 
+    // FTSR
+    stash_we = '0;
+    wdata_stash_d = '0;
+
     // we will not commit the instruction if we took an exception
     // and we do not commit the instruction if we requested a halt
     if (commit_instr_i[0].valid && !commit_instr_i[0].ex.valid && !halt_i) begin
@@ -156,16 +178,20 @@ module commit_stage
         commit_macro_ack[0] = 1'b1;
       else commit_macro_ack[0] = 1'b0;
       if (commit_instr_i[0].is_ftsr && commit_instr_i[0].idx_ftsr != '0) begin
-        // TODO: Write to partial result stash for ftsr...
+        stash_we     [commit_instr_i[0].idx_ftsr] = 1'b1;
+        wdata_stash_d[commit_instr_i[0].idx_ftsr] = commit_instr_i[0].result;
       end
       // we can definitely write the register file
       // if the instruction is not committing anything the destination
       commit_ack_o[0] = 1'b1;
-      if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[0].op) && !(commit_instr_i[0].is_ftsr && commit_instr_i[0].idx_ftsr != '0)) begin
-        // TODO: Check against stash for ftsr before actual write
+      if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[0].op)) begin
         we_fpr_o[0] = 1'b1;
       end else begin
-        // TODO: Check against stash for ftsr before actual write
+        if (commit_instr_i[0].is_ftsr && commit_instr_i[0].idx_ftsr == '0) begin
+          if(commit_instr_i[0].result != wdata_stash_q[1] && commit_instr_i[0].result != wdata_stash_q[2]) begin
+            wdata_o[0] = wdata_stash_q[1];
+          end
+        end
         we_gpr_o[0] = 1'b1;
       end
       // check whether the instruction we retire was a store
@@ -295,21 +321,22 @@ module commit_stage
                           && !(commit_instr_i[0].fu inside {CSR})
                           && !flush_dcache_i
                           && !instr_0_is_amo
-                          && !single_step_i) begin
+                          && !single_step_i
+                          && !(commit_instr_i[1].is_ftsr && commit_instr_i[1].idx_ftsr == '0) // FTSR final commit on port 0 only
+                          ) begin
         // only if the first instruction didn't throw an exception and this instruction won't throw an exception
         // and the functional unit is of type ALU, LOAD, CTRL_FLOW, MULT, FPU or FPU_VEC
         if (!exception_o.valid && !commit_instr_i[1].ex.valid
                                        && (commit_instr_i[1].fu inside {ALU, LOAD, CTRL_FLOW, MULT, FPU, FPU_VEC})) begin
 
           if (commit_instr_i[1].is_ftsr && commit_instr_i[1].idx_ftsr != '0) begin
-            // TODO: Write to partial result stash for ftsr...
+            stash_we     [commit_instr_i[1].idx_ftsr] = 1'b1;
+            wdata_stash_d[commit_instr_i[1].idx_ftsr] = commit_instr_i[1].result;
           end
 
-          if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[1].op) && !(commit_instr_i[1].is_ftsr && commit_instr_i[1].idx_ftsr != '0)) begin
-            // TODO: Check against stash for ftsr before actual write
+          if (CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(commit_instr_i[1].op)) begin
             we_fpr_o[1] = 1'b1;
           end else begin
-            // TODO: Check against stash for ftsr before actual write
             we_gpr_o[1] = 1'b1;
           end
 
