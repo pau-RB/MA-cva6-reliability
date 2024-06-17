@@ -101,8 +101,7 @@ module instr_scan #(
                                                        riscv::OpcodeMadd   ,
                                                        riscv::OpcodeMsub   ,
                                                        riscv::OpcodeNmsub  ,
-                                                       riscv::OpcodeNmadd  ,
-                                                       riscv::OpcodeOpFp   });
+                                                       riscv::OpcodeNmadd  });
 
   // opcode JAL
   assign rvc_jump_o   = ((instr_i[15:13] == riscv::OpcodeC1J) & is_rvc & (instr_i[1:0] == riscv::OpcodeC1)) | rv32_rvc_jal;
