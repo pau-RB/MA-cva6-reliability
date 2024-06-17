@@ -277,7 +277,8 @@ module cva6
     parameter type acc_cfg_t = logic,
     parameter acc_cfg_t AccCfg = '0,
     parameter type cvxif_req_t = cvxif_pkg::cvxif_req_t,
-    parameter type cvxif_resp_t = cvxif_pkg::cvxif_resp_t
+    parameter type cvxif_resp_t = cvxif_pkg::cvxif_resp_t,
+    localparam NumPorts = 4
 ) (
     // Subsystem Clock - SUBSYSTEM
     input logic clk_i,
@@ -304,7 +305,37 @@ module cva6
     // noc request, can be AXI or OpenPiton - SUBSYSTEM
     output noc_req_t noc_req_o,
     // noc response, can be AXI or OpenPiton - SUBSYSTEM
-    input noc_resp_t noc_resp_i
+    input noc_resp_t noc_resp_i,
+
+    /* Cache offloading - FTSR synth */
+
+    output riscv::priv_lvl_t priv_lvl_o,
+    // I$
+    output logic icache_en_o,  // enable icache (or bypass e.g: in debug mode)
+    output logic icache_flush_o,  // flush the icache, flush and kill have to be asserted together
+    input logic icache_miss_i,  // to performance counter
+    // address translation requests
+    output icache_areq_t icache_areq_o,  // to/from frontend
+    input icache_arsp_t icache_areq_i,
+    // data requests
+    output icache_dreq_t icache_dreq_o,  // to/from frontend
+    input icache_drsp_t icache_dreq_i,
+    // AMOs
+    output amo_req_t amo_req_o,
+    input amo_resp_t amo_resp_i,
+    // D$
+    // Cache management
+    output logic dcache_enable_o,  // from CSR
+    output logic dcache_flush_o,  // high until acknowledged
+    input logic                           dcache_flush_ack_i,     // send a single cycle acknowledge signal when the cache is flushed
+    input logic dcache_miss_i,  // we missed on a ld/st
+    input logic                           wbuffer_empty_i,        // statically set to 1, as there is no wbuffer in this cache system
+    // Request ports
+    output dcache_req_o_t [NumPorts-1:0] dcache_req_ports_o,  // to/from LSU
+    input dcache_req_o_t [NumPorts-1:0] dcache_req_ports_i  // to/from LSU
+
+    /* Cache offloading - FTSR synth */
+
 );
 
   localparam type interrupts_t = struct packed {
@@ -346,7 +377,7 @@ module cva6
   logic             [CVA6Cfg.NrCommitPorts-1:0] commit_ack;
   logic             [CVA6Cfg.NrCommitPorts-1:0] commit_macro_ack;
 
-  localparam NumPorts = 4;
+//  localparam NumPorts = 4;
   cvxif_pkg::cvxif_req_t cvxif_req;
   cvxif_pkg::cvxif_resp_t cvxif_resp;
 
@@ -1197,6 +1228,9 @@ module cva6
     dcache_req_ports_cache_acc[1].data_gnt &= !dcache_req_ports_ex_cache[2].data_req;
   end
 
+/* cache offload for FTSR synthesis */
+
+/*
   if (CVA6Cfg.DCacheType == config_pkg::WT) begin : gen_cache_wt
     // this is a cache subsystem that is compatible with OpenPiton
     wt_cache_subsystem #(
@@ -1265,8 +1299,8 @@ module cva6
         .axi_r_chan_t (r_chan_t),
         .noc_req_t (noc_req_t),
         .noc_resp_t(noc_resp_t),
-        .cmo_req_t (logic  /*FIXME*/),
-        .cmo_rsp_t (logic  /*FIXME*/)
+        .cmo_req_t (logic  /*FIXME),
+        .cmo_rsp_t (logic  /*FIXME)
     ) i_cache_subsystem (
         .clk_i (clk_i),
         .rst_ni(rst_ni),
@@ -1287,8 +1321,8 @@ module cva6
         .dcache_amo_req_i (amo_req),
         .dcache_amo_resp_o(amo_resp),
 
-        .dcache_cmo_req_i ('0  /*FIXME*/),
-        .dcache_cmo_resp_o(  /*FIXME*/),
+        .dcache_cmo_req_i ('0  /*FIXME),
+        .dcache_cmo_resp_o(  /*FIXME),
 
         .dcache_req_ports_i(dcache_req_to_cache),
         .dcache_req_ports_o(dcache_req_from_cache),
@@ -1296,16 +1330,16 @@ module cva6
         .wbuffer_empty_o (dcache_commit_wbuffer_empty),
         .wbuffer_not_ni_o(dcache_commit_wbuffer_not_ni),
 
-        .hwpf_base_set_i    ('0  /*FIXME*/),
-        .hwpf_base_i        ('0  /*FIXME*/),
-        .hwpf_base_o        (  /*FIXME*/),
-        .hwpf_param_set_i   ('0  /*FIXME*/),
-        .hwpf_param_i       ('0  /*FIXME*/),
-        .hwpf_param_o       (  /*FIXME*/),
-        .hwpf_throttle_set_i('0  /*FIXME*/),
-        .hwpf_throttle_i    ('0  /*FIXME*/),
-        .hwpf_throttle_o    (  /*FIXME*/),
-        .hwpf_status_o      (  /*FIXME*/),
+        .hwpf_base_set_i    ('0  /*FIXME),
+        .hwpf_base_i        ('0  /*FIXME),
+        .hwpf_base_o        (  /*FIXME),
+        .hwpf_param_set_i   ('0  /*FIXME),
+        .hwpf_param_i       ('0  /*FIXME),
+        .hwpf_param_o       (  /*FIXME),
+        .hwpf_throttle_set_i('0  /*FIXME),
+        .hwpf_throttle_i    ('0  /*FIXME),
+        .hwpf_throttle_o    (  /*FIXME),
+        .hwpf_status_o      (  /*FIXME),
 
         .noc_req_o (noc_req_o),
         .noc_resp_i(noc_resp_i)
@@ -1364,6 +1398,35 @@ module cva6
     assign dcache_commit_wbuffer_not_ni = 1'b1;
     assign inval_ready                  = 1'b1;
   end
+*/
+
+/* cache offload for FTSR synthesis */
+
+  assign priv_lvl_o                   = priv_lvl;
+  // I$
+  assign icache_en_o                  = icache_en_csr;
+  assign icache_flush_o               = icache_flush_ctrl_cache;
+  assign icache_miss_cache_perf       = icache_miss_i     ;
+  assign icache_areq_o                = icache_areq_ex_cache;
+  assign icache_areq_cache_ex         = icache_areq_i     ;
+  assign icache_dreq_o                = icache_dreq_if_cache;
+  assign icache_dreq_cache_if         = icache_dreq_i     ;
+  // D$
+  assign dcache_enable_o              = dcache_en_csr_nbdcache;
+  assign dcache_flush_o               = dcache_flush_ctrl_cache;
+  assign dcache_flush_ack_cache_ctrl  = dcache_flush_ack_i;
+  // to commit stage
+  assign amo_req_o                    = amo_req;
+  assign amo_resp                     = amo_resp_i        ;
+  assign dcache_miss_cache_perf       = dcache_miss_i     ;
+  // this is statically set to 1 as the std_cache does not have a wbuffer
+  assign dcache_commit_wbuffer_empty  = wbuffer_empty_i   ;
+  // from PTW, Load Unit  and Store Unit
+  assign dcache_req_ports_o           = dcache_req_to_cache;
+  assign dcache_req_from_cache        = dcache_req_ports_i;
+
+/* cache offload for FTSR synthesis */
+
 
   // ----------------
   // Accelerator
