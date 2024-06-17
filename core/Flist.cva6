@@ -159,7 +159,6 @@ ${CVA6_REPO_DIR}/core/cache_subsystem/cache_ctrl.sv
 ${CVA6_REPO_DIR}/core/cache_subsystem/cva6_icache_axi_wrapper.sv
 ${CVA6_REPO_DIR}/core/cache_subsystem/std_cache_subsystem.sv
 ${CVA6_REPO_DIR}/core/cache_subsystem/std_nbdcache.sv
-${HPDCACHE_TARGET_CFG}
 -F ${HPDCACHE_DIR}/rtl/hpdcache.Flist
 ${HPDCACHE_DIR}/rtl/src/utils/hpdcache_mem_req_read_arbiter.sv
 ${HPDCACHE_DIR}/rtl/src/utils/hpdcache_mem_req_write_arbiter.sv
@@ -169,6 +168,7 @@ ${HPDCACHE_DIR}/rtl/src/utils/hpdcache_mem_to_axi_write.sv
 ${CVA6_REPO_DIR}/core/cache_subsystem/cva6_hpdcache_subsystem.sv
 ${CVA6_REPO_DIR}/core/cache_subsystem/cva6_hpdcache_subsystem_axi_arbiter.sv
 ${CVA6_REPO_DIR}/core/cache_subsystem/cva6_hpdcache_if_adapter.sv
+${CVA6_REPO_DIR}/core/cache_subsystem/cva6_hpdcache_wrapper.sv
 ${HPDCACHE_DIR}/rtl/src/common/macros/behav/hpdcache_sram_1rw.sv
 ${HPDCACHE_DIR}/rtl/src/common/macros/behav/hpdcache_sram_wbyteenable_1rw.sv
 ${HPDCACHE_DIR}/rtl/src/common/macros/behav/hpdcache_sram_wmask_1rw.sv
@@ -181,23 +181,15 @@ ${CVA6_REPO_DIR}/core/pmp/src/pmp_entry.sv
 // Tracer (behavioral code, not RTL)
 ${CVA6_REPO_DIR}/common/local/util/instr_tracer.sv
 ${CVA6_REPO_DIR}/common/local/util/tc_sram_wrapper.sv
+${CVA6_REPO_DIR}/common/local/util/tc_sram_wrapper_cache_techno.sv
 ${CVA6_REPO_DIR}/vendor/pulp-platform/tech_cells_generic/src/rtl/tc_sram.sv
 ${CVA6_REPO_DIR}/common/local/util/sram.sv
+${CVA6_REPO_DIR}/common/local/util/sram_cache.sv
 
-// MMU Sv39
-${CVA6_REPO_DIR}/core/mmu_sv39/mmu.sv
-${CVA6_REPO_DIR}/core/mmu_sv39/ptw.sv
-${CVA6_REPO_DIR}/core/mmu_sv39/tlb.sv
-
-// MMU Sv39x4
-${CVA6_REPO_DIR}/core/mmu_sv39x4/cva6_mmu_sv39x4.sv
-${CVA6_REPO_DIR}/core/mmu_sv39x4/cva6_ptw_sv39x4.sv
-${CVA6_REPO_DIR}/core/mmu_sv39x4/cva6_tlb_sv39x4.sv
-
-// MMU Sv32
-${CVA6_REPO_DIR}/core/mmu_sv32/cva6_mmu_sv32.sv
-${CVA6_REPO_DIR}/core/mmu_sv32/cva6_ptw_sv32.sv
-${CVA6_REPO_DIR}/core/mmu_sv32/cva6_tlb_sv32.sv
-${CVA6_REPO_DIR}/core/mmu_sv32/cva6_shared_tlb_sv32.sv
+// MMU 
+${CVA6_REPO_DIR}/core/cva6_mmu/cva6_mmu.sv
+${CVA6_REPO_DIR}/core/cva6_mmu/cva6_ptw.sv
+${CVA6_REPO_DIR}/core/cva6_mmu/cva6_tlb.sv
+${CVA6_REPO_DIR}/core/cva6_mmu/cva6_shared_tlb.sv
 
 // end of manifest

@@ -24,8 +24,8 @@ covergroup cg_cva6_config(string name) with function sample(cva6_cfg_t CVA6Cfg);
    cp_Xlen : coverpoint CVA6Cfg.XLEN {
       bins Xlen ={32};
    }
-   cp_FpuEn : coverpoint CVA6Cfg.FpuEn {
-      bins FpuEn ={0};
+   cp_RVF : coverpoint CVA6Cfg.RVF {
+      bins RVF ={0};
    }
    cp_F16En : coverpoint CVA6Cfg.XF16 {
       bins F16En ={0};
@@ -76,7 +76,7 @@ covergroup cg_cva6_config(string name) with function sample(cva6_cfg_t CVA6Cfg);
       bins DataUserEn ={0};
    }
    cp_IcacheSetAssoc : coverpoint CVA6Cfg.ICACHE_SET_ASSOC {
-      bins IcacheSetAssoc ={4};
+      bins IcacheSetAssoc ={2};
    }
    cp_IcacheLineWidth : coverpoint CVA6Cfg.ICACHE_LINE_WIDTH {
       bins IcacheLineWidth ={128};
@@ -94,7 +94,7 @@ covergroup cg_cva6_config(string name) with function sample(cva6_cfg_t CVA6Cfg);
       bins FpgaEn ={0};
    }
    cp_NrLoadBufEntries : coverpoint CVA6Cfg.NrLoadBufEntries {
-      bins NrLoadBufEntries ={1};
+      bins NrLoadBufEntries ={2};
    }
    cp_RASDepth : coverpoint CVA6Cfg.RASDepth {
       bins RASDepth ={2};
@@ -116,11 +116,11 @@ covergroup cg_cva6_config(string name) with function sample(cva6_cfg_t CVA6Cfg);
    }
 endgroup: cg_cva6_config
 
-covergroup cg_cva6_boot_addr(string name) with function sample(bit [cva6_config_pkg::CVA6ConfigXlen-1:0] boot_addr);
+covergroup cg_cva6_boot_addr(string name) with function sample(uvme_cva6_cfg_c cfg);
    option.per_instance = 1;
    option.name = name;
    
-   cp_boot_addr : coverpoint boot_addr {
+   cp_boot_addr : coverpoint cfg.boot_addr {
       bins BOOT_ADDR_0 ={0};
       bins BOOT_ADDR_LOW ={[1:'h10000_0000]};
       bins BOOT_ADDR_HIGH ={['h10000_0000:$]};
@@ -163,9 +163,6 @@ class uvme_cva6_config_covg_c extends uvm_component;
    uvme_cva6_cfg_c         cfg      ;
    uvme_cva6_cntxt_c       cntxt    ;
 
-   // Handle to RTL configuration
-   cva6_cfg_t         CVA6Cfg;
-
    `uvm_analysis_imp_decl(_reset)
    uvm_analysis_imp_reset #(uvma_clknrst_mon_trn_c, uvme_cva6_config_covg_c) reset_imp;
    
@@ -198,11 +195,6 @@ function void uvme_cva6_config_covg_c::build_phase(uvm_phase phase);
 
    super.build_phase(phase);
 
-   void'(uvm_config_db#(cva6_cfg_t)::get(this, "", "CVA6Cfg", CVA6Cfg));
-   if (!CVA6Cfg) begin
-      `uvm_fatal("CVA6Cfg", "RTL Configuration handle is null")
-   end
-
    void'(uvm_config_db#(uvme_cva6_cfg_c)::get(this, "", "cfg", cfg));
    if (!cfg) begin
       `uvm_fatal("CFG", "Configuration handle is null")
@@ -222,8 +214,8 @@ endfunction : build_phase
 
 function void uvme_cva6_config_covg_c::sample_cva6_config();
 
-   config_cg.sample(CVA6Cfg);
-   boot_addr_cg.sample(cfg.boot_addr);
+   config_cg.sample(cfg.CVA6Cfg);
+   boot_addr_cg.sample(cfg);
    clock_period_cg.sample(cfg.sys_clk_period);
    
 endfunction : sample_cva6_config

@@ -64,8 +64,14 @@ package config_pkg;
     bit                          RVZCMP;
     // Zicond RISC-V extension
     bit                          RVZiCond;
+    // Zicntr RISC-V extension
+    bit                          RVZicntr;
+    // Zihpm RISC-V extension
+    bit                          RVZihpm;
     // Floating Point
-    bit                          FpuEn;
+    bit                          RVF;
+    // Floating Point
+    bit                          RVD;
     // Non standard 16bits Floating Point extension
     bit                          XF16;
     // Non standard 16bits Floating Point Alt extension
@@ -92,6 +98,8 @@ package config_pkg;
     logic [63:0]                 ExceptionAddress;
     // Tval Support Enable
     bit                          TvalEn;
+    // MTVEC CSR supports only direct mode
+    bit                          DirectVecOnly;
     // PMP entries number
     int unsigned                 NrPMPEntries;
     // PMP CSR configuration reset values
@@ -160,6 +168,8 @@ package config_pkg;
     int unsigned                 FetchUserWidth;
     // Is FPGA optimization of CV32A6
     bit                          FpgaEn;
+    // Is Techno Cut instanciated
+    bit                          TechnoCut;
     // Number of commit ports
     int unsigned                 NrCommitPorts;
     // Load cycle latency number
@@ -182,6 +192,10 @@ package config_pkg;
     int unsigned                 InstrTlbEntries;
     // MMU data TLB entries
     int unsigned                 DataTlbEntries;
+    // MMU option to use shared TLB
+    bit unsigned                 UseSharedTlb;
+    // MMU depth of shared TLB
+    int unsigned                 SharedTlbDepth;
   } cva6_user_cfg_t;
 
   typedef struct packed {
@@ -196,6 +210,7 @@ package config_pkg;
     int unsigned VMID_WIDTH;
 
     bit          FpgaEn;
+    bit          TechnoCut;
     /// Number of commit ports, i.e., maximum number of instructions that the
     /// core can retire per cycle. It can be beneficial to have more commit
     /// ports than issue ports, for the scoreboard to empty out in case one
@@ -210,7 +225,8 @@ package config_pkg;
     int unsigned AxiUserWidth;
     int unsigned MEM_TID_WIDTH;
     int unsigned NrLoadBufEntries;
-    bit          FpuEn;
+    bit          RVF;
+    bit          RVD;
     bit          XF16;
     bit          XF16ALT;
     bit          XF8;
@@ -224,12 +240,12 @@ package config_pkg;
     bit          XFVec;
     bit          CvxifEn;
     bit          RVZiCond;
+    bit          RVZicntr;
+    bit          RVZihpm;
 
     int unsigned NR_SB_ENTRIES;
     int unsigned TRANS_ID_BITS;
 
-    bit          RVF;
-    bit          RVD;
     bit          FpPresent;
     bit          NSX;
     int unsigned FLen;
@@ -252,9 +268,14 @@ package config_pkg;
     int unsigned BHTEntries;
     int unsigned InstrTlbEntries;
     int unsigned DataTlbEntries;
+    bit unsigned UseSharedTlb;
+    int unsigned SharedTlbDepth;
+    int unsigned VpnLen;
+    int unsigned PtLevels;
 
     logic [63:0]                 DmBaseAddress;
     bit                          TvalEn;
+    bit                          DirectVecOnly;
     int unsigned                 NrPMPEntries;
     logic [15:0][63:0]           PMPCfgRstVal;
     logic [15:0][63:0]           PMPAddrRstVal;

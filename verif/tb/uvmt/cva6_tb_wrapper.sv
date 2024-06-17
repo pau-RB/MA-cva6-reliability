@@ -280,7 +280,7 @@ module cva6_tb_wrapper import uvmt_cva6_pkg::*; #(
 
            if (binary != "") begin
 
-               void'(read_elf(binary));
+               read_elf(binary);
                wait(clk_i);
 
                last_load_address = 'hFFFFFFFF;
@@ -289,7 +289,7 @@ module cva6_tb_wrapper import uvmt_cva6_pkg::*; #(
                    automatic int num_words0 = (len+7)/8;
                    `uvm_info( "Core Test", $sformatf("Loading Address: %x, Length: %x", address, len), UVM_LOW)
                    buffer = new [num_words0*8];
-                   void'(read_section_sv(address, buffer));
+                   read_section_sv(address, buffer);
                    // preload memories
                    // 64-bit
                    for (int i = 0; i < num_words0; i++) begin
@@ -299,8 +299,12 @@ module cva6_tb_wrapper import uvmt_cva6_pkg::*; #(
                        end
                        load_address = (address[23:0] >> 3) + i;
                        if (load_address != last_load_address) begin
-                           `MAIN_MEM(load_address) = mem_row;
-                           last_load_address = load_address;
+                          if (address[31:0] < 'h84000000) begin
+                            `MAIN_MEM(load_address) = mem_row;
+                          end else begin
+                             `USER_MEM(load_address) = mem_row;
+                          end
+                          last_load_address = load_address;
                        end else begin
                            `uvm_info( "Debug info", $sformatf(" Address: %x Already Loaded! ELF file might have less than 64 bits granularity on segments.", load_address), UVM_LOW)
                        end

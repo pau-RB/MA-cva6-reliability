@@ -3,19 +3,17 @@ package build_config_pkg;
   function automatic config_pkg::cva6_cfg_t build_config(config_pkg::cva6_user_cfg_t CVA6Cfg);
     bit IS_XLEN32 = (CVA6Cfg.XLEN == 32) ? 1'b1 : 1'b0;
     bit IS_XLEN64 = (CVA6Cfg.XLEN == 32) ? 1'b0 : 1'b1;
-    bit RVF = (IS_XLEN64 | IS_XLEN32) & CVA6Cfg.FpuEn;
-    bit RVD = (IS_XLEN64 ? 1 : 0) & CVA6Cfg.FpuEn;
-    bit FpPresent = RVF | RVD | CVA6Cfg.XF16 | CVA6Cfg.XF16ALT | CVA6Cfg.XF8;
+    bit FpPresent = CVA6Cfg.RVF | CVA6Cfg.RVD | CVA6Cfg.XF16 | CVA6Cfg.XF16ALT | CVA6Cfg.XF8;
     bit NSX = CVA6Cfg.XF16 | CVA6Cfg.XF16ALT | CVA6Cfg.XF8 | CVA6Cfg.XFVec;  // Are non-standard extensions present?
-    int unsigned FLen = RVD ? 64 :  // D ext.
-    RVF ? 32 :  // F ext.
+    int unsigned FLen = CVA6Cfg.RVD ? 64 :  // D ext.
+    CVA6Cfg.RVF ? 32 :  // F ext.
     CVA6Cfg.XF16 ? 16 :  // Xf16 ext.
     CVA6Cfg.XF16ALT ? 16 :  // Xf16alt ext.
     CVA6Cfg.XF8 ? 8 :  // Xf8 ext.
     1;  // Unused in case of no FP
 
     // Transprecision floating-point extensions configuration
-    bit RVFVec     = RVF             & CVA6Cfg.XFVec & FLen>32; // FP32 vectors available if vectors and larger fmt enabled
+    bit RVFVec     = CVA6Cfg.RVF     & CVA6Cfg.XFVec & FLen>32; // FP32 vectors available if vectors and larger fmt enabled
     bit XF16Vec    = CVA6Cfg.XF16    & CVA6Cfg.XFVec & FLen>16; // FP16 vectors available if vectors and larger fmt enabled
     bit XF16ALTVec = CVA6Cfg.XF16ALT & CVA6Cfg.XFVec & FLen>16; // FP16ALT vectors available if vectors and larger fmt enabled
     bit XF8Vec     = CVA6Cfg.XF8     & CVA6Cfg.XFVec & FLen>8;  // FP8 vectors available if vectors and larger fmt enabled
@@ -26,6 +24,10 @@ package build_config_pkg;
     int unsigned ICACHE_INDEX_WIDTH = $clog2(CVA6Cfg.IcacheByteSize / CVA6Cfg.IcacheSetAssoc);
     int unsigned DCACHE_INDEX_WIDTH = $clog2(CVA6Cfg.DcacheByteSize / CVA6Cfg.DcacheSetAssoc);
     int unsigned DCACHE_OFFSET_WIDTH = $clog2(CVA6Cfg.DcacheLineWidth / 8);
+
+    // MMU
+    int unsigned VpnLen = (CVA6Cfg.XLEN == 64) ? (CVA6Cfg.RVH ? 29 : 27) : 20;
+    int unsigned PtLevels = (CVA6Cfg.XLEN == 64) ? 3 : 2;
 
     config_pkg::cva6_cfg_t cfg;
 
@@ -40,6 +42,7 @@ package build_config_pkg;
     cfg.VMID_WIDTH = (CVA6Cfg.XLEN == 64) ? 14 : 1;
 
     cfg.FpgaEn = CVA6Cfg.FpgaEn;
+    cfg.TechnoCut = CVA6Cfg.TechnoCut;
     cfg.NrCommitPorts = CVA6Cfg.NrCommitPorts;
     cfg.NrLoadPipeRegs = CVA6Cfg.NrLoadPipeRegs;
     cfg.NrStorePipeRegs = CVA6Cfg.NrStorePipeRegs;
@@ -49,7 +52,8 @@ package build_config_pkg;
     cfg.AxiUserWidth = CVA6Cfg.AxiUserWidth;
     cfg.MEM_TID_WIDTH = CVA6Cfg.MemTidWidth;
     cfg.NrLoadBufEntries = CVA6Cfg.NrLoadBufEntries;
-    cfg.FpuEn = CVA6Cfg.FpuEn;
+    cfg.RVF = CVA6Cfg.RVF;
+    cfg.RVD = CVA6Cfg.RVD;
     cfg.XF16 = CVA6Cfg.XF16;
     cfg.XF16ALT = CVA6Cfg.XF16ALT;
     cfg.XF8 = CVA6Cfg.XF8;
@@ -63,11 +67,11 @@ package build_config_pkg;
     cfg.XFVec = CVA6Cfg.XFVec;
     cfg.CvxifEn = CVA6Cfg.CvxifEn;
     cfg.RVZiCond = CVA6Cfg.RVZiCond;
+    cfg.RVZicntr = CVA6Cfg.RVZicntr;
+    cfg.RVZihpm = CVA6Cfg.RVZihpm;
     cfg.NR_SB_ENTRIES = CVA6Cfg.NrScoreboardEntries;
     cfg.TRANS_ID_BITS = $clog2(CVA6Cfg.NrScoreboardEntries);
 
-    cfg.RVF = bit'(RVF);
-    cfg.RVD = bit'(RVD);
     cfg.FpPresent = bit'(FpPresent);
     cfg.NSX = bit'(NSX);
     cfg.FLen = unsigned'(FLen);
@@ -75,7 +79,7 @@ package build_config_pkg;
     cfg.XF16Vec = bit'(XF16Vec);
     cfg.XF16ALTVec = bit'(XF16ALTVec);
     cfg.XF8Vec = bit'(XF8Vec);
-    cfg.NrRgprPorts = unsigned'(2);
+    cfg.NrRgprPorts = unsigned'(2 << ariane_pkg::SUPERSCALAR);
     cfg.NrWbPorts = unsigned'(NrWbPorts);
     cfg.EnableAccelerator = bit'(EnableAccelerator);
     cfg.PerfCounterEn = CVA6Cfg.PerfCounterEn;
@@ -90,6 +94,7 @@ package build_config_pkg;
     cfg.BHTEntries = CVA6Cfg.BHTEntries;
     cfg.DmBaseAddress = CVA6Cfg.DmBaseAddress;
     cfg.TvalEn = CVA6Cfg.TvalEn;
+    cfg.DirectVecOnly = CVA6Cfg.DirectVecOnly;
     cfg.NrPMPEntries = CVA6Cfg.NrPMPEntries;
     cfg.PMPCfgRstVal = CVA6Cfg.PMPCfgRstVal;
     cfg.PMPAddrRstVal = CVA6Cfg.PMPAddrRstVal;
@@ -150,6 +155,10 @@ package build_config_pkg;
     cfg.SVX = (cfg.MODE_SV == config_pkg::ModeSv32) ? 34 : 41;
     cfg.InstrTlbEntries = CVA6Cfg.InstrTlbEntries;
     cfg.DataTlbEntries = CVA6Cfg.DataTlbEntries;
+    cfg.UseSharedTlb = CVA6Cfg.UseSharedTlb;
+    cfg.SharedTlbDepth = CVA6Cfg.SharedTlbDepth;
+    cfg.VpnLen = VpnLen;
+    cfg.PtLevels = PtLevels;
 
     return cfg;
   endfunction

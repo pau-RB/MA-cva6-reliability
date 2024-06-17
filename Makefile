@@ -12,6 +12,8 @@ vcs-library    ?= work-vcs
 dpi-library    ?= work-dpi
 # Top level module to compile
 top_level      ?= ariane_tb
+# Top level path
+top_level_path ?= corev_apu/tb/$(top_level).sv
 # Maximum amount of cycles for a successful simulation run
 max_cycles     ?= 10000000
 # Test case to run
@@ -110,12 +112,6 @@ endif
 HPDCACHE_DIR ?= $(CVA6_REPO_DIR)/core/cache_subsystem/hpdcache
 export HPDCACHE_DIR
 
-# Target HPDcache configuration package.
-#   The HPDCACHE_TARGET_CFG variable contains the path (relative or absolute)
-#   to your target configuration package
-HPDCACHE_TARGET_CFG ?= ${CVA6_REPO_DIR}/core/include/cva6_hpdcache_default_config_pkg.sv
-export HPDCACHE_TARGET_CFG
-
 # Sources
 # Package files -> compile first
 ariane_pkg := \
@@ -146,7 +142,7 @@ CFLAGS += -I$(QUESTASIM_HOME)/include         \
           -I$(VL_INC_DIR)/vltstd              \
           -I$(RISCV)/include                  \
           -I$(SPIKE_INSTALL_DIR)/include      \
-          -std=c++17 -I../corev_apu/tb/dpi -O3
+          -std=c++17 -I$(CVA6_REPO_DIR)/corev_apu/tb/dpi -O3
 
 ifdef XCELIUM_HOME
 CFLAGS += -I$(XCELIUM_HOME)/tools/include
@@ -155,13 +151,13 @@ $(warning XCELIUM_HOME not set which is necessary for compiling DPIs when using 
 endif
 
 # this list contains the standalone components
-src :=  core/include/$(target)_config_pkg.sv                                         \
-        $(if $(spike-tandem),verif/tb/core/uvma_core_cntrl_pkg.sv)                   \
+src :=  $(if $(spike-tandem),verif/tb/core/uvma_core_cntrl_pkg.sv)                   \
         $(if $(spike-tandem),verif/tb/core/uvma_cva6pkg_utils_pkg.sv)                \
         $(if $(spike-tandem),verif/tb/core/uvma_rvfi_pkg.sv)                         \
         $(if $(spike-tandem),verif/tb/core/uvmc_rvfi_reference_model_pkg.sv)         \
         $(if $(spike-tandem),verif/tb/core/uvmc_rvfi_scoreboard_pkg.sv)              \
         $(if $(spike-tandem),corev_apu/tb/common/spike.sv)                           \
+        core/cva6_rvfi.sv                                                            \
         corev_apu/src/ariane.sv                                                      \
         $(wildcard corev_apu/bootrom/*.sv)                                           \
         $(wildcard corev_apu/clint/*.sv)                                             \
@@ -228,7 +224,7 @@ fpga_src :=  $(wildcard corev_apu/fpga/src/*.sv) $(wildcard corev_apu/fpga/src/a
 fpga_src := $(addprefix $(root-dir), $(fpga_src)) src/bootrom/bootrom_$(XLEN).sv
 
 # look for testbenches
-tbs := corev_apu/tb/ariane_tb.sv corev_apu/tb/ariane_testharness.sv core/cva6_rvfi.sv
+tbs := $(top_level_path) corev_apu/tb/ariane_testharness.sv core/cva6_rvfi.sv
 
 tbs := $(addprefix $(root-dir), $(tbs))
 
@@ -260,11 +256,11 @@ incdir := $(CVA6_REPO_DIR)/vendor/pulp-platform/common_cells/include/ $(CVA6_REP
           $(SPIKE_INSTALL_DIR)/include/disasm/
 
 # Compile and sim flags
-compile_flag     += -incr -64 -nologo -quiet -suppress 13262 -suppress 8607 -permissive -svinputport=compat +define+$(defines) -suppress 8386
-vopt_flag +=  -incr -64 -nologo -quiet -suppress 13262 -permissive -svinputport=compat -t 1ns
+compile_flag     += -incr -64 -nologo -quiet -suppress 13262 -suppress 8607 -permissive -svinputport=compat +define+$(defines) -suppress 8386 -suppress vlog-2577
+vopt_flag += -suppress 2085 -suppress 7063 -suppress 2698 -suppress 13262
 
 uvm-flags        += +UVM_NO_RELNOTES +UVM_VERBOSITY=UVM_LOW
-questa-flags     += -t 1ns -64 $(gui-sim) $(QUESTASIM_FLAGS) +tohost_addr=$(tohost_addr) +define+QUESTA
+questa-flags     += -t 1ns -64 $(gui-sim) $(QUESTASIM_FLAGS) +tohost_addr=$(tohost_addr) +define+QUESTA -suppress 3356 -suppress 3579
 compile_flag_vhd += -64 -nologo -quiet -2008
 
 # Iterate over all include directories and write them with +incdir+ prefixed
@@ -304,16 +300,19 @@ else
 	questa-cmd += +jtag_rbb_enable=0
 endif
 
+flist ?= core/Flist.cva6
+
 vcs_build: $(dpi-library)/ariane_dpi.so
 	mkdir -p $(vcs-library)
 	cd $(vcs-library) &&\
-	vlogan $(if $(VERDI), -kdb,) -full64 -nc -sverilog +define+$(defines) -assert svaext -f ../core/Flist.cva6 $(list_incdir) &&\
+	vlogan $(if $(VERDI), -kdb,) -full64 -nc -sverilog +define+$(defines) -assert svaext -f $(flist) $(list_incdir) ../corev_apu/tb/common/mock_uart.sv -timescale=1ns/1ns &&\
 	vlogan $(if $(VERDI), -kdb,) -full64 -nc -sverilog +define+$(defines) $(filter %.sv,$(ariane_pkg)) +incdir+core/include/+$(VCS_HOME)/etc/uvm-1.2/dpi &&\
 	vhdlan $(if $(VERDI), -kdb,) -full64 -nc $(filter %.vhd,$(uart_src)) &&\
 	vlogan $(if $(VERDI), -kdb,) -full64 -nc -sverilog -assert svaext +define+$(defines) +incdir+$(VCS_HOME)/etc/uvm/src $(VCS_HOME)/etc/uvm/src/uvm_pkg.sv  $(filter %.sv,$(src)) $(list_incdir) &&\
 	vlogan $(if $(VERDI), -kdb,) -full64 -nc -sverilog -ntb_opts uvm-1.2 &&\
 	vlogan $(if $(VERDI), -kdb,) -full64 -nc -sverilog -ntb_opts uvm-1.2 $(tbs) +define+$(defines) $(list_incdir) &&\
-	vcs $(if $(DEBUG), -debug_access+all $(if $(VERDI), -kdb),) $(if $(TRACE_COMPACT),+vcs+fsdbon) -full64 -timescale=1ns/1ns -ntb_opts uvm-1.2 work.ariane_tb -error="IWNF"
+	vcs $(if $(DEBUG), -debug_access+all $(if $(VERDI), -kdb),) $(if $(TRACE_COMPACT),+vcs+fsdbon) -ignore initializer_driver_checks -timescale=1ns/1ns -ntb_opts uvm-1.2 work.$(top_level) -error="IWNF" \
+	$(if $(gate), -sdf Max:ariane_gate_tb.i_ariane.i_cva6:$(CVA6_REPO_DIR)/pd/synth/cva6_$(TARGET)_synth.sdf +neg_tchk, +notimingcheck)
 
 vcs: vcs_build
 	cd $(vcs-library) && \
@@ -324,7 +323,7 @@ vcs: vcs_build
 # Build the TB and module using QuestaSim
 build: $(library) $(library)/.build-srcs $(library)/.build-tb $(dpi-library)/ariane_dpi.so
 	# Optimize top level
-	$(VOPT) -64 -work $(library)  $(top_level) -o $(top_level)_optimized +acc -check_synthesis -dpilib $(SPIKE_INSTALL_DIR)/lib/libriscv -dpilib $(SPIKE_INSTALL_DIR)/lib/lifesvr -suppress 2085 -suppress 7063
+	$(VOPT) -64 -work $(library)  $(top_level) -o $(top_level)_optimized +acc -check_synthesis -dpilib $(SPIKE_INSTALL_DIR)/lib/libriscv -dpilib $(SPIKE_INSTALL_DIR)/lib/lifesvr  $(vopt_flag)
 
 # src files
 $(library)/.build-srcs: $(library)
@@ -353,6 +352,12 @@ $(dpi-library)/ariane_dpi.so: $(dpi)
 	mkdir -p $(dpi-library)
 	# Compile C-code and generate .so file
 	$(CXX) -shared -m64 -o $(dpi-library)/ariane_dpi.so $? -L$(RISCV)/lib -L$(SPIKE_INSTALL_DIR)/lib -Wl,-rpath,$(RISCV)/lib -Wl,-rpath,$(SPIKE_INSTALL_DIR)/lib -lfesvr -lriscv
+
+$(dpi-library)/xrun_ariane_dpi.so: $(dpi)
+	# Make Dir work-dpi
+	mkdir -p $(dpi-library)
+	# Compile C-code and generate .so file
+	$(CXX) -shared -m64 -o $(dpi-library)/xrun_ariane_dpi.so $? -L$(RISCV)/lib -L$(SPIKE_INSTALL_DIR)/lib -Wl,-rpath,$(RISCV)/lib -Wl,-rpath,$(SPIKE_INSTALL_DIR)/lib -lfesvr -lriscv
 
 # single test runs on Questa can be started by calling make <testname>, e.g. make towers.riscv
 # the test names are defined in ci/riscv-asm-tests.list, and in ci/riscv-benchmarks.list
@@ -430,24 +435,25 @@ check-benchmarks:
 XRUN               ?= xrun
 XRUN_WORK_DIR      ?= xrun_work
 XRUN_RESULTS_DIR   ?= xrun_results
-XRUN_UVMHOME_ARG   ?= CDNS-1.2-ML
+##XRUN_UVMHOME_ARG   ?= CDNS-1.2-ML
+XRUN_UVMHOME_ARG   ?= CDNS-1.2
 XRUN_COMPL_LOG     ?= xrun_compl.log
 XRUN_RUN_LOG       ?= xrun_run.log
 CVA6_HOME	   ?= $(realpath -s $(root-dir))
 
-XRUN_INCDIR :=+incdir+$(CVA6_HOME)/src/axi_node 	\
-	+incdir+$(CVA6_HOME)/src/common_cells/include 	\
-	+incdir+$(CVA6_HOME)/src/util
+XRUN_INCDIR :=+incdir+$(CVA6_HOME)/core/include 			\
+	+incdir+$(CVA6_HOME)/vendor/pulp-platform/axi/include/		\
+	+incdir+$(CVA6_HOME)/corev_apu/register_interface/include
+
 XRUN_TB := $(addprefix $(CVA6_HOME)/, corev_apu/tb/ariane_tb.sv)
 
-XRUN_COMP_FLAGS  ?= -64bit -disable_sem2009 -access +rwc 			\
-		    -sv -v93 -uvm -uvmhome $(XRUN_UVMHOME_ARG) 			\
-		    -sv_lib $(CVA6_HOME)/$(dpi-library)/ariane_dpi.so		\
+XRUN_COMP_FLAGS  ?= -64bit -v200x -disable_sem2009 -access +rwc 			\
+		    -sv -uvm -uvmhome $(XRUN_UVMHOME_ARG) 			\
+		    -sv_lib $(CVA6_HOME)/$(dpi-library)/xrun_ariane_dpi.so		\
 		    -smartorder -sv -top worklib.$(top_level)			\
-		    -xceligen on=1903 +define+$(defines) -timescale 1ns/1ps	\
+		    -timescale 1ns/1ps
 
-XRUN_RUN_FLAGS := -R -64bit -disable_sem2009 -access +rwc -timescale 1ns/1ps		\
-		-sv_lib	$(CVA6_HOME)/$(dpi-library)/ariane_dpi.so -xceligen on=1903	\
+XRUN_RUN_FLAGS := -R -messages -status -64bit -licqueue -noupdate -uvmhome CDNS-1.2 -sv_lib $(CVA6_HOME)/$(dpi-library)/xrun_ariane_dpi.so +UVM_VERBOSITY=UVM_LOW  		
 
 XRUN_DISABLED_WARNINGS := BIGWIX 	\
 			ZROMCW 		\
@@ -461,21 +467,21 @@ XRUN_DISABLED_WARNINGS 	:= $(patsubst %, -nowarn %, $(XRUN_DISABLED_WARNINGS))
 XRUN_COMP = $(XRUN_COMP_FLAGS)		\
 	$(XRUN_DISABLED_WARNINGS) 	\
 	$(XRUN_INCDIR)		      	\
+	-f ../core/Flist.cva6    	\
 	$(filter %.sv, $(ariane_pkg)) 	\
-	$(filter %.vhd, $(uart_src))  	\
 	$(filter %.sv, $(src))	      	\
-	-f ../core/Flist.cva6    	    \
-	$(filter %.sv, $(XRUN_TB))	\
+	$(filter %.vhd, $(uart_src))  	\
+	$(filter %.sv, $(XRUN_TB))	
 
 XRUN_RUN = $(XRUN_RUN_FLAGS) 		\
-	$(XRUN_DISABLED_WARNINGS)	\
+	$(XRUN_DISABLED_WARNINGS)	
 
 xrun_clean:
 	@echo "[XRUN] clean up"
 	rm -rf $(XRUN_RESULTS_DIR)
 	rm -rf $(dpi-library)
 
-xrun_comp: $(dpi-library)/ariane_dpi.so
+xrun_comp: $(dpi-library)/xrun_ariane_dpi.so
 	@echo "[XRUN] Building Model"
 	mkdir -p $(XRUN_RESULTS_DIR)
 	cd $(XRUN_RESULTS_DIR) && $(XRUN)   \
@@ -492,11 +498,13 @@ xrun_sim: xrun_comp
 		$(XRUN_RUN)			\
 		+MAX_CYCLES=$(max_cycles)	\
 		+UVM_TESTNAME=$(test_case)	\
-		-l $(XRUN_RUN_LOG)		\
+		+time_out=200000000000            \
+		+tohost_addr=$(shell ${RISCV}/bin/${CV_SW_PREFIX}nm -B $(elf) | grep -w tohost | cut -d' ' -f1)          \
+		-log $(XRUN_RUN_LOG)		\
+		+gui				\
 		+permissive-off			\
-		++$(elf_file)
-
-#-e "set_severity_pack_assert_off {warning}; set_pack_assert_off {numeric_std}" TODO: This will remove assertion warning at the beginning of the simulation.
+		+elf_file=$(elf)           \
+		++$(elf)
 
 xrun_all: xrun_clean xrun_comp xrun_sim
 
@@ -692,7 +700,6 @@ check-torture:
 src_flist = $(shell \
 	    CVA6_REPO_DIR=$(CVA6_REPO_DIR) \
 	    TARGET_CFG=$(TARGET_CFG) \
-	    HPDCACHE_TARGET_CFG=$(HPDCACHE_TARGET_CFG) \
 	    HPDCACHE_DIR=$(HPDCACHE_DIR) \
 	    python3 util/flist_flattener.py core/Flist.cva6)
 fpga_filter := $(addprefix $(root-dir), corev_apu/bootrom/bootrom.sv)
